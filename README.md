@@ -2,6 +2,12 @@
 
 A lightweight, responsive click game that starts with a player name prompt, runs a 30-second round, and posts the final score to the FairPlay backend.
 
+## Mobile Notes
+
+- Optimized for both desktop and mobile viewport sizes.
+- Results modal supports mobile scrolling for smaller screens.
+- Arena and controls adapt spacing and sizing for touch use.
+
 ## What it sends
 
 The game creates a session and then submits these metrics to the API:

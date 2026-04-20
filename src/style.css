@@ -428,6 +428,17 @@ h1 {
     grid-template-columns: 1fr;
   }
 
+  .intro-card,
+  .preview-card {
+    padding: 1rem;
+    border-radius: 20px;
+  }
+
+  h1 {
+    font-size: 2rem;
+    line-height: 1;
+  }
+
   .field-row {
     flex-direction: column;
   }
@@ -442,7 +453,22 @@ h1 {
     grid-template-columns: 1fr;
   }
 
+  .results-card {
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+    padding: 1rem;
+    border-radius: 20px;
+  }
+
+  .results-actions {
+    justify-content: center;
+  }
+
+  .results-actions .primary-button {
+    width: 100%;
+  }
+
   .arena {
-    min-height: min(58vh, 540px);
+    min-height: min(52vh, 460px);
   }
 }
