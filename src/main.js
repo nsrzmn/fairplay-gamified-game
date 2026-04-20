@@ -3,6 +3,7 @@ import './style.css';
 const app = document.querySelector('#app');
 
 const API_BASE = normalizeApiBase(import.meta.env.VITE_API_URL || '/api');
+const PUBLIC_API_FALLBACK_BASE = normalizeApiBase(import.meta.env.VITE_BACKEND_PUBLIC_URL || '');
 const GAME_SECONDS = 30;
 const MIN_TARGET_LIFE_MS = 900;
 const MAX_TARGET_LIFE_MS = 1500;
@@ -53,13 +54,37 @@ function normalizeApiBase(value) {
 }
 
 async function api(path, options = {}) {
-  const response = await fetch(`${API_BASE}${path.startsWith('/') ? path : `/${path}`}`, {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+
+  const requestInit = {
     headers: {
       'Content-Type': 'application/json',
       ...(options.headers || {}),
     },
     ...options,
-  });
+  };
+
+  const response = await fetch(`${API_BASE}${normalizedPath}`, requestInit);
+
+  // If same-origin proxy (/api) fails with gateway errors, retry directly against public backend.
+  if (
+    response.status === 502 &&
+    API_BASE.startsWith('/') &&
+    PUBLIC_API_FALLBACK_BASE &&
+    /^https?:\/\//i.test(PUBLIC_API_FALLBACK_BASE)
+  ) {
+    const fallbackResponse = await fetch(`${PUBLIC_API_FALLBACK_BASE}${normalizedPath}`, requestInit);
+    if (!fallbackResponse.ok) {
+      const fallbackText = await fallbackResponse.text();
+      throw new Error(fallbackText || `Request failed with status ${fallbackResponse.status}`);
+    }
+
+    if (fallbackResponse.status === 204) {
+      return null;
+    }
+
+    return fallbackResponse.json();
+  }
 
   if (!response.ok) {
     const text = await response.text();
