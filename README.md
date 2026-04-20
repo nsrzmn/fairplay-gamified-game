@@ -39,8 +39,10 @@ The game creates a session and then submits these metrics to the API:
 ## Environment
 
 - `VITE_API_URL` defaults to `/api` and should usually stay `/api`.
+- Backend routes remain `/sessions`, `/health`, etc. The `/api` prefix is only on the game service and is stripped by proxy before forwarding.
 - `BACKEND_INTERNAL_URL` is used by the runtime server to proxy `/api` to your backend service.
 - `BACKEND_PUBLIC_URL` is an optional fallback if private networking cannot be reached from the game service.
+- `VITE_BACKEND_PUBLIC_URL` is an optional browser fallback URL if `/api` responds with `502`.
 - `VITE_DEV_API_TARGET` is optional and only used for local `npm run dev` proxying.
 
 ## Railway deployment
