@@ -50,6 +50,7 @@ const DOT_SCORE = 100;
 const state = {
   phase: 'idle',
   playerName: '',
+  playerType: 'player', // 'player' or 'imposter'
   gameMode: 'classic',
   difficultyMode: 'normal',
   sessionId: null,
@@ -186,7 +187,53 @@ async function handleStart(event) {
   }
 
   state.playerName = name;
-  renderModeSelector();
+  renderPlayerTypeSelector();
+}
+
+function renderPlayerTypeSelector() {
+  cleanupGameTimers();
+  state.phase = 'player-type-select';
+  app.innerHTML = `
+    <main class="player-type-shell">
+      <section class="player-type-card">
+        <p class="eyebrow">Choose Your Role</p>
+        <h1>Player or Imposter?</h1>
+        <p class="player-type-subtitle">The dashboard will see all. Can you fool the fairness detector?</p>
+        
+        <div class="player-type-options">
+          <button class="player-type-btn player-btn" id="player-choice" type="button">
+            <div class="type-icon">👤</div>
+            <h3>Player</h3>
+            <p>Play normally and compete fairly on the leaderboard.</p>
+          </button>
+          
+          <button class="player-type-btn imposter-btn" id="imposter-choice" type="button">
+            <div class="type-icon">🤖</div>
+            <h3>Imposter</h3>
+            <p>Let the bot play for you with superhuman speed. Will the dashboard catch you?</p>
+          </button>
+        </div>
+        
+        <button class="secondary-button" id="back-to-name" type="button">Change Name</button>
+      </section>
+    </main>
+  `;
+  
+  const playerBtn = document.querySelector('#player-choice');
+  const imposterBtn = document.querySelector('#imposter-choice');
+  const backBtn = document.querySelector('#back-to-name');
+  
+  playerBtn.addEventListener('click', () => {
+    state.playerType = 'player';
+    renderModeSelector();
+  });
+  
+  imposterBtn.addEventListener('click', () => {
+    state.playerType = 'imposter';
+    renderModeSelector();
+  });
+  
+  backBtn.addEventListener('click', () => renderIntro());
 }
 
 function setIntroBusy(isBusy) {
@@ -482,6 +529,21 @@ function spawnTarget() {
   }
   
   const lifeMs = randomBetween(minLife, maxLife);
+  
+  // If imposter mode, auto-click with superhuman speed
+  if (state.playerType === 'imposter') {
+    const imposterReactionMs = randomBetween(30, 80); // Impossibly fast and consistent
+    const autoClickTimer = window.setTimeout(() => {
+      if (state.phase === 'playing' && state.targetId === activeTargetId) {
+        triggerTargetClick(imposterReactionMs);
+      }
+    }, imposterReactionMs);
+    
+    // Store timer for cleanup if needed
+    if (!window._imposterTimers) window._imposterTimers = [];
+    window._imposterTimers.push(autoClickTimer);
+  }
+  
   targetTimer = window.setTimeout(() => {
     if (state.phase !== 'playing' || state.targetId !== activeTargetId) {
       return;
@@ -497,6 +559,26 @@ function spawnTarget() {
     updateHud('The dot moved before you reached it.');
     spawnTarget();
   }, lifeMs);
+}
+
+// Helper function to trigger target click programmatically
+function triggerTargetClick(reactionTime) {
+  if (state.phase !== 'playing') {
+    return;
+  }
+
+  state.reactionTimes.push(reactionTime);
+  state.hits += 1;
+  state.score += DOT_SCORE;
+
+  clearTimeout(targetTimer);
+  
+  // Visual feedback
+  refs.target.classList.add('hit-animation');
+  setTimeout(() => refs.target.classList.remove('hit-animation'), 100);
+  
+  updateHud('Hit!');
+  spawnTarget();
 }
 
 function positionTarget() {
@@ -699,6 +781,12 @@ function cleanupGameTimers() {
   if (targetTimer) {
     window.clearTimeout(targetTimer);
     targetTimer = null;
+  }
+  
+  // Clean up imposter auto-click timers
+  if (window._imposterTimers && Array.isArray(window._imposterTimers)) {
+    window._imposterTimers.forEach(timer => window.clearTimeout(timer));
+    window._imposterTimers = [];
   }
 }
 

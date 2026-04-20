@@ -393,6 +393,109 @@ h1 {
   justify-content: flex-end;
 }
 
+.player-type-shell {
+  min-height: 100vh;
+  padding: clamp(1rem, 2vw, 1.5rem);
+  display: grid;
+  align-items: center;
+}
+
+.player-type-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px);
+  border-radius: var(--radius);
+  padding: clamp(1.25rem, 3vw, 2.25rem);
+  margin: 0 auto;
+  max-width: 600px;
+  width: 100%;
+}
+
+.player-type-subtitle {
+  color: var(--muted);
+  font-size: clamp(0.95rem, 1.4vw, 1.05rem);
+  line-height: 1.6;
+  max-width: 42ch;
+}
+
+.player-type-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+}
+
+.player-type-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.5rem;
+  border: 2px solid var(--line);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: center;
+  min-height: 240px;
+}
+
+.player-type-btn:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent);
+  background: rgba(99, 242, 209, 0.1);
+  box-shadow: 0 8px 24px rgba(99, 242, 209, 0.2);
+}
+
+.player-type-btn.imposter-btn:hover {
+  border-color: var(--warn);
+  background: rgba(255, 195, 111, 0.08);
+  box-shadow: 0 8px 24px rgba(255, 195, 111, 0.2);
+}
+
+.type-icon {
+  font-size: 3.5rem;
+  margin-bottom: 1rem;
+}
+
+.player-type-btn h3 {
+  font-size: 1.3rem;
+  margin: 0 0 0.75rem 0;
+}
+
+.player-type-btn p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.mode-selector-shell {
+  min-height: 100vh;
+  padding: clamp(1rem, 2vw, 1.5rem);
+  display: grid;
+  align-items: center;
+}
+
+.mode-selector-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px);
+  border-radius: var(--radius);
+  padding: clamp(1.25rem, 3vw, 2.25rem);
+  margin: 0 auto;
+  max-width: 800px;
+  width: 100%;
+}
+
+.hit-animation {
+  animation: pulseGlow 0.3s ease-out;
+}
+
 @keyframes pulseGlow {
   0%,
   100% {
