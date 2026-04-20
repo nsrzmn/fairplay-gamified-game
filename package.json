@@ -1,0 +1,14 @@
+{
+  "name": "fairplay-gamified-game",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "start": "node server.cjs"
+  },
+  "dependencies": {
+    "vite": "^6.4.1"
+  }
+}
