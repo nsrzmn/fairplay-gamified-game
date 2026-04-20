@@ -472,4 +472,152 @@ h1 {
   .arena {
     min-height: min(52vh, 460px);
   }
+}/* Mode Selector Styles */
+.mode-selector-shell {
+  min-height: 100vh;
+  padding: clamp(1rem, 2vw, 1.5rem);
+  display: grid;
+  align-items: center;
+  justify-items: center;
+}
+
+.mode-selector-card {
+  width: 100%;
+  max-width: 42rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  padding: clamp(1.5rem, 4vw, 2.5rem);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px);
+}
+
+.mode-select-group,
+.difficulty-select-group {
+  margin-bottom: 2rem;
+}
+
+.modes-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.mode-card {
+  position: relative;
+  cursor: pointer;
+}
+
+.mode-card input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.mode-label {
+  display: block;
+  padding: 1.25rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 2px solid var(--line);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mode-label:hover {
+  border-color: var(--accent);
+  background: rgba(99, 242, 209, 0.08);
+}
+
+.mode-card input[type="radio"]:checked + .mode-label {
+  border-color: var(--accent);
+  background: rgba(99, 242, 209, 0.15);
+  box-shadow: 0 0 0 8px rgba(99, 242, 209, 0.08);
+}
+
+.mode-label h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.1rem;
+}
+
+.mode-label p {
+  margin: 0;
+  font-size: 0.87rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.difficulty-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.difficulty-option {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  transition: all 0.2s ease;
+}
+
+.difficulty-option:hover {
+  border-color: var(--accent-2);
+  background: rgba(118, 169, 255, 0.1);
+}
+
+.difficulty-option input[type="radio"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+.difficulty-option input[type="radio"]:checked + span {
+  color: var(--accent-2);
+  font-weight: 700;
+}
+
+.mode-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 2rem;
+  justify-content: flex-end;
+}
+
+.secondary-button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  min-height: 3.4rem;
+  padding: 0 1.35rem;
+  color: var(--text);
+  font-weight: 700;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.secondary-button:hover {
+  border-color: var(--accent);
+  background: rgba(99, 242, 209, 0.08);
+}
+
+@media (max-width: 640px) {
+  .modes-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .intro-shell {
+    grid-template-columns: 1fr;
+  }
+  
+  .preview-card {
+    grid-row: 1;
+    min-height: 16rem;
+  }
 }

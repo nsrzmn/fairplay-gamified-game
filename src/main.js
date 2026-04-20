@@ -4,14 +4,54 @@ const app = document.querySelector('#app');
 
 const API_BASE = normalizeApiBase(import.meta.env.VITE_API_URL || '/api');
 const PUBLIC_API_FALLBACK_BASE = normalizeApiBase(import.meta.env.VITE_BACKEND_PUBLIC_URL || '');
-const GAME_SECONDS = 30;
-const MIN_TARGET_LIFE_MS = 900;
-const MAX_TARGET_LIFE_MS = 1500;
+
+// Game mode configurations
+const GAME_MODES = {
+  classic: {
+    name: 'Classic',
+    description: 'Standard 30-second game with normal target speed.',
+    difficulties: {
+      easy: { label: 'Easy', duration: 45, minLife: 2000, maxLife: 2500 },
+      normal: { label: 'Normal', duration: 30, minLife: 900, maxLife: 1500 },
+      hard: { label: 'Hard', duration: 20, minLife: 500, maxLife: 900 },
+    },
+  },
+  time_attack: {
+    name: 'Time Attack',
+    description: 'Score as many points as you can in 2 minutes. Target speed increases every 10 hits.',
+    difficulties: {
+      easy: { label: 'Easy', duration: 120, minLife: 2000, maxLife: 2500, scaling: 0.95 },
+      normal: { label: 'Normal', duration: 120, minLife: 900, maxLife: 1500, scaling: 0.90 },
+      hard: { label: 'Hard', duration: 120, minLife: 500, maxLife: 900, scaling: 0.80 },
+    },
+  },
+  survival: {
+    name: 'Survival',
+    description: 'Hit targets until you miss. Try to achieve the highest hit count!',
+    difficulties: {
+      easy: { label: 'Easy', duration: 999, minLife: 2000, maxLife: 2500, scaling: 0.98 },
+      normal: { label: 'Normal', duration: 999, minLife: 900, maxLife: 1500, scaling: 0.93 },
+      hard: { label: 'Hard', duration: 999, minLife: 500, maxLife: 900, scaling: 0.85 },
+    },
+  },
+  accuracy_challenge: {
+    name: 'Accuracy Challenge',
+    description: 'Score bonus for high accuracy. Empty clicks are penalized. 60 seconds to prove your precision.',
+    difficulties: {
+      easy: { label: 'Easy', duration: 60, minLife: 2000, maxLife: 2500 },
+      normal: { label: 'Normal', duration: 60, minLife: 900, maxLife: 1500 },
+      hard: { label: 'Hard', duration: 60, minLife: 500, maxLife: 900 },
+    },
+  },
+};
+
 const DOT_SCORE = 100;
 
 const state = {
   phase: 'idle',
   playerName: '',
+  gameMode: 'classic',
+  difficultyMode: 'normal',
   sessionId: null,
   score: 0,
   hits: 0,
@@ -19,9 +59,10 @@ const state = {
   emptyClicks: 0,
   reactionTimes: [],
   startLatencyMs: 0,
-  timeLeft: GAME_SECONDS,
+  timeLeft: 0,
   spawnAt: 0,
   targetId: 0,
+  modeConfig: null,
 };
 
 const refs = {
@@ -144,24 +185,8 @@ async function handleStart(event) {
     return;
   }
 
-  setIntroBusy(true);
-  showIntroError('');
-
-  try {
-    const startedAt = performance.now();
-    const session = await api('/sessions', {
-      method: 'POST',
-      body: JSON.stringify({ player: name }),
-    });
-
-    state.playerName = session.player || name;
-    state.sessionId = session.id;
-    state.startLatencyMs = Math.max(0, Math.round(performance.now() - startedAt));
-    startGame();
-  } catch (error) {
-    showIntroError(error.message || 'Could not start the game. Check the API URL and try again.');
-    setIntroBusy(false);
-  }
+  state.playerName = name;
+  renderModeSelector();
 }
 
 function setIntroBusy(isBusy) {
@@ -183,6 +208,124 @@ function showIntroError(message) {
   }
 }
 
+function renderModeSelector() {
+  cleanupGameTimers();
+  state.phase = 'mode-select';
+  
+  const modeOptions = Object.entries(GAME_MODES).map(([key, mode]) => `
+    <div class="mode-card">
+      <input type="radio" id="mode-${key}" name="gameMode" value="${key}" ${key === 'classic' ? 'checked' : ''} />
+      <label for="mode-${key}" class="mode-label">
+        <h3>${mode.name}</h3>
+        <p>${mode.description}</p>
+      </label>
+    </div>
+  `).join('');
+  
+  const diffOptions = Object.entries(GAME_MODES.classic.difficulties).map(([key, diff]) => `
+    <label class="difficulty-option">
+      <input type="radio" name="difficulty" value="${key}" ${key === 'normal' ? 'checked' : ''} />
+      <span>${diff.label}</span>
+    </label>
+  `).join('');
+  
+  app.innerHTML = `
+    <main class="mode-selector-shell">
+      <section class="mode-selector-card">
+        <p class="eyebrow">Game Setup</p>
+        <h1>Choose your challenge</h1>
+        
+        <div class="mode-select-group">
+          <p class="field-label">Game Mode</p>
+          <div id="mode-options" class="modes-container">
+            ${modeOptions}
+          </div>
+        </div>
+        
+        <div class="difficulty-select-group">
+          <p class="field-label">Difficulty</p>
+          <div id="difficulty-options" class="difficulty-container">
+            ${diffOptions}
+          </div>
+        </div>
+        
+        <div class="mode-actions">
+          <button class="secondary-button" type="button" id="back-btn">Back</button>
+          <button class="primary-button" type="button" id="play-btn">Play</button>
+        </div>
+      </section>
+    </main>
+  `;
+  
+  const modeRadios = document.querySelectorAll('input[name="gameMode"]');
+  const diffRadios = document.querySelectorAll('input[name="difficulty"]');
+  const backBtn = document.querySelector('#back-btn');
+  const playBtn = document.querySelector('#play-btn');
+  const diffContainer = document.querySelector('#difficulty-options');
+  
+  modeRadios.forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      state.gameMode = e.target.value;
+      updateDifficultyOptions();
+    });
+  });
+  
+  diffRadios.forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      state.difficultyMode = e.target.value;
+    });
+  });
+  
+  backBtn.addEventListener('click', () => renderIntro());
+  playBtn.addEventListener('click', async () => {
+    await startGameSession();
+  });
+}
+
+function updateDifficultyOptions() {
+  const modeConfig = GAME_MODES[state.gameMode];
+  const difficulties = Object.entries(modeConfig.difficulties);
+  
+  const diffContainer = document.querySelector('#difficulty-options');
+  diffContainer.innerHTML = difficulties.map(([key, diff]) => `
+    <label class="difficulty-option">
+      <input type="radio" name="difficulty" value="${key}" ${key === state.difficultyMode ? 'checked' : ''} />
+      <span>${diff.label}</span>
+    </label>
+  `).join('');
+  
+  const diffRadios = document.querySelectorAll('input[name="difficulty"]');
+  diffRadios.forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      state.difficultyMode = e.target.value;
+    });
+  });
+}
+
+async function startGameSession() {
+  const playBtn = document.querySelector('#play-btn');
+  if (playBtn) playBtn.disabled = true;
+  
+  try {
+    const startedAt = performance.now();
+    const session = await api('/sessions', {
+      method: 'POST',
+      body: JSON.stringify({
+        player: state.playerName,
+        game_mode: state.gameMode,
+        difficulty_mode: state.difficultyMode,
+      }),
+    });
+
+    state.sessionId = session.id;
+    state.startLatencyMs = Math.max(0, Math.round(performance.now() - startedAt));
+    startGame();
+  } catch (error) {
+    if (playBtn) playBtn.disabled = false;
+    alert(error.message || 'Could not start the game. Check the API URL and try again.');
+  }
+}
+
 function startGame() {
   state.phase = 'playing';
   state.score = 0;
@@ -190,7 +333,8 @@ function startGame() {
   state.missedTargets = 0;
   state.emptyClicks = 0;
   state.reactionTimes = [];
-  state.timeLeft = GAME_SECONDS;
+  state.modeConfig = GAME_MODES[state.gameMode][state.difficultyMode];
+  state.timeLeft = state.modeConfig.duration;
   state.spawnAt = 0;
   state.targetId = 0;
   finishLock = false;
@@ -275,7 +419,7 @@ function startGame() {
 
   refs.board.addEventListener('click', handleBoardClick);
   refs.target.addEventListener('click', handleTargetClick);
-  refs.playAgain.addEventListener('click', () => renderIntro());
+  refs.playAgain.addEventListener('click', () => renderModeSelector());
 
   updateHud();
   spawnTarget();
@@ -324,9 +468,28 @@ function spawnTarget() {
   positionTarget();
 
   clearTimeout(targetTimer);
-  const lifeMs = randomBetween(MIN_TARGET_LIFE_MS, MAX_TARGET_LIFE_MS);
+  
+  // Apply difficulty-based timing, with scaling for survival mode
+  const baseConfig = state.modeConfig;
+  let minLife = baseConfig.minLife;
+  let maxLife = baseConfig.maxLife;
+  
+  // For survival mode, increase difficulty every 10 hits
+  if (state.gameMode === 'survival' && baseConfig.scaling) {
+    const difficulty_factor = Math.pow(baseConfig.scaling, Math.floor(state.hits / 10));
+    minLife = Math.round(minLife * difficulty_factor);
+    maxLife = Math.round(maxLife * difficulty_factor);
+  }
+  
+  const lifeMs = randomBetween(minLife, maxLife);
   targetTimer = window.setTimeout(() => {
     if (state.phase !== 'playing' || state.targetId !== activeTargetId) {
+      return;
+    }
+
+    // For survival mode, missing ends the game
+    if (state.gameMode === 'survival') {
+      finishGame();
       return;
     }
 
@@ -374,7 +537,7 @@ async function finishGame() {
   cleanupGameTimers();
 
   const summary = buildSummary();
-  showResults(summary, 'Submitting results...');
+  showResults(summary, 'Submitting results...', null);
 
   try {
     await api(`/sessions/${state.sessionId}/metrics`, {
@@ -386,9 +549,20 @@ async function finishGame() {
       method: 'POST',
     });
 
-    showResults(summary, 'Results saved to the dashboard.');
+    // Fetch leaderboard for current mode/difficulty
+    let leaderboardData = null;
+    try {
+      leaderboardData = await api(
+        `/leaderboard/global?mode=${state.gameMode}&difficulty=${state.difficultyMode}&limit=5`,
+        { method: 'GET' }
+      );
+    } catch (error) {
+      console.warn('Could not fetch leaderboard:', error);
+    }
+
+    showResults(summary, 'Results saved to the dashboard.', leaderboardData);
   } catch (error) {
-    showResults(summary, `Saved locally, but API submission failed: ${error.message}`);
+    showResults(summary, `Saved locally, but API submission failed: ${error.message}`, null);
   } finally {
     state.phase = 'finished';
     setIntroBusy(false);
@@ -401,10 +575,24 @@ function buildSummary() {
   const accuracy = totalClicks > 0 ? roundToOne((state.hits / totalClicks) * 100) : 0;
   const averageReaction = average(state.reactionTimes);
   const reactionStd = standardDeviation(state.reactionTimes);
+  
+  let finalScore = state.score;
+  
+  // Apply game mode-specific scoring
+  if (state.gameMode === 'accuracy_challenge') {
+    // Base score from hits
+    finalScore = state.hits * DOT_SCORE;
+    // Penalty for empty clicks
+    finalScore -= state.emptyClicks * 10;
+    // Bonus for high accuracy
+    const accuracyBonus = Math.floor((accuracy / 10) * 25); // 0-25 bonus for 0-100% accuracy
+    finalScore += accuracyBonus;
+    finalScore = Math.max(0, finalScore); // Ensure non-negative
+  }
 
   return {
     sessionId: state.sessionId,
-    score: state.score,
+    score: finalScore,
     accuracy,
     reactionTime: Math.round(averageReaction),
     reactionStd: roundToOne(reactionStd),
@@ -454,13 +642,40 @@ function formatAccuracy() {
   return roundToOne((state.hits / totalClicks) * 100).toFixed(1);
 }
 
-function showResults(summary, message) {
+function showResults(summary, message, leaderboardData = null) {
   if (!refs.results || !refs.resultsBody) {
     return;
   }
 
+  const modeDisplay = GAME_MODES[state.gameMode].name;
+  const diffDisplay = GAME_MODES[state.gameMode].difficulties[state.difficultyMode].label;
+  
+  let modeSpecificMetric = '';
+  if (state.gameMode === 'survival') {
+    modeSpecificMetric = `<div class="metric"><span>Hit Streak</span><strong>${summary.targetsHit}</strong></div>`;
+  } else if (state.gameMode === 'accuracy_challenge') {
+    modeSpecificMetric = `<div class="metric"><span>Accuracy Bonus</span><strong>+${Math.max(0, Math.floor((summary.accuracy / 10) * 25))}</strong></div>`;
+  }
+  
+  let leaderboardHtml = '';
+  if (leaderboardData && leaderboardData.leaderboard) {
+    const topScores = leaderboardData.leaderboard.slice(0, 3);
+    leaderboardHtml = `
+      <div class="leaderboard-section" style="grid-column: 1 / -1; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--line);">
+        <p style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Top Scores This Mode</p>
+        ${topScores.map((entry, idx) => `
+          <div class="metric" style="padding: 0.5rem 0; ${entry.player_name === state.playerName ? 'background: rgba(99, 242, 209, 0.1); border-radius: 8px; padding: 0.5rem 0.75rem; margin-bottom: 0.5rem;' : ''}">
+            <span>#${idx + 1} - ${escapeHtml(entry.player_name)}</span>
+            <strong>${entry.score}</strong>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
   refs.results.classList.remove('hidden');
   refs.resultsBody.innerHTML = `
+    <div class="metric"><span>Mode</span><strong>${escapeHtml(modeDisplay)} (${escapeHtml(diffDisplay)})</strong></div>
     <div class="metric"><span>Player</span><strong>${escapeHtml(state.playerName)}</strong></div>
     <div class="metric"><span>Score</span><strong>${summary.score}</strong></div>
     <div class="metric"><span>Accuracy</span><strong>${summary.accuracy.toFixed(1)}%</strong></div>
@@ -468,7 +683,9 @@ function showResults(summary, message) {
     <div class="metric"><span>Hits</span><strong>${summary.targetsHit}</strong></div>
     <div class="metric"><span>Misses</span><strong>${summary.targetsMissed}</strong></div>
     <div class="metric"><span>Empty clicks</span><strong>${summary.emptyClicks}</strong></div>
+    ${modeSpecificMetric}
     <div class="metric"><span>API latency</span><strong>${summary.networkLatency} ms</strong></div>
+    ${leaderboardHtml}
     <p class="results-note">${escapeHtml(message)}</p>
   `;
 }
