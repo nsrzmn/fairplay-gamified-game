@@ -403,6 +403,7 @@ function buildSummary() {
   const reactionStd = standardDeviation(state.reactionTimes);
 
   return {
+    sessionId: state.sessionId,
     score: state.score,
     accuracy,
     reactionTime: Math.round(averageReaction),
