@@ -2,7 +2,7 @@ import './style.css';
 
 const app = document.querySelector('#app');
 
-const API_BASE = normalizeApiBase(import.meta.env.VITE_API_URL || 'http://localhost:8000');
+const API_BASE = normalizeApiBase(import.meta.env.VITE_API_URL || '/api');
 const GAME_SECONDS = 30;
 const MIN_TARGET_LIFE_MS = 900;
 const MAX_TARGET_LIFE_MS = 1500;

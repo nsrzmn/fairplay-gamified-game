@@ -38,7 +38,9 @@ The game creates a session and then submits these metrics to the API:
 
 ## Environment
 
-- `VITE_API_URL` should point to the deployed backend, for example `https://fairplay-gamified-backend-production.up.railway.app`.
+- `VITE_API_URL` defaults to `/api` and should usually stay `/api`.
+- `BACKEND_INTERNAL_URL` is used by the runtime server to proxy `/api` to your backend service.
+- `VITE_DEV_API_TARGET` is optional and only used for local `npm run dev` proxying.
 
 ## Railway deployment
 
@@ -47,5 +49,9 @@ Use the included `Dockerfile` or deploy the folder as a Node service.
 - Build command: `npm run build`
 - Start command: `node server.cjs`
 - Public port: `4173` or the Railway `PORT` value exposed to the container
+
+Recommended Railway variable:
+
+- `BACKEND_INTERNAL_URL=http://fairplay-gamified-backend.railway.internal`
 
 The game is static after build, so it stays lightweight even when hosted on Railway.
