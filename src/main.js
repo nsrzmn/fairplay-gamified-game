@@ -333,7 +333,7 @@ function startGame() {
   state.missedTargets = 0;
   state.emptyClicks = 0;
   state.reactionTimes = [];
-  state.modeConfig = GAME_MODES[state.gameMode][state.difficultyMode];
+  state.modeConfig = GAME_MODES[state.gameMode].difficulties[state.difficultyMode];
   state.timeLeft = state.modeConfig.duration;
   state.spawnAt = 0;
   state.targetId = 0;
