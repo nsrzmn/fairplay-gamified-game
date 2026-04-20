@@ -40,6 +40,7 @@ The game creates a session and then submits these metrics to the API:
 
 - `VITE_API_URL` defaults to `/api` and should usually stay `/api`.
 - `BACKEND_INTERNAL_URL` is used by the runtime server to proxy `/api` to your backend service.
+- `BACKEND_PUBLIC_URL` is an optional fallback if private networking cannot be reached from the game service.
 - `VITE_DEV_API_TARGET` is optional and only used for local `npm run dev` proxying.
 
 ## Railway deployment
@@ -53,5 +54,9 @@ Use the included `Dockerfile` or deploy the folder as a Node service.
 Recommended Railway variable:
 
 - `BACKEND_INTERNAL_URL=http://fairplay-gamified-backend.railway.internal`
+
+Optional fallback variable:
+
+- `BACKEND_PUBLIC_URL=https://fairplay-gamified-backend-production.up.railway.app`
 
 The game is static after build, so it stays lightweight even when hosted on Railway.

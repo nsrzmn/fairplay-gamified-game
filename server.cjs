@@ -7,11 +7,34 @@ const { URL } = require('node:url');
 const rootDir = __dirname;
 const distDir = path.join(rootDir, 'dist');
 const port = Number(process.env.PORT || 4173);
-const rawBackendTarget = (process.env.BACKEND_INTERNAL_URL || 'http://localhost:8000').trim();
-const backendTarget = /^https?:\/\//i.test(rawBackendTarget)
-  ? rawBackendTarget
-  : `http://${rawBackendTarget}`;
-const backendUrl = new URL(backendTarget);
+
+function parseTarget(rawValue) {
+  const trimmed = String(rawValue || '').trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const normalized = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
+  return new URL(normalized);
+}
+
+const primaryBackendUrl =
+  parseTarget(process.env.BACKEND_INTERNAL_URL) ||
+  parseTarget(process.env.BACKEND_PUBLIC_URL) ||
+  parseTarget('http://localhost:8000');
+
+const fallbackBackendUrl = (() => {
+  const candidate = parseTarget(process.env.BACKEND_PUBLIC_URL);
+  if (!candidate) {
+    return null;
+  }
+
+  if (candidate.origin === primaryBackendUrl.origin && candidate.pathname === primaryBackendUrl.pathname) {
+    return null;
+  }
+
+  return candidate;
+})();
 
 const mimeTypes = {
   '.html': 'text/html; charset=utf-8',
@@ -63,6 +86,50 @@ function resolveAsset(urlPath) {
   return null;
 }
 
+function forwardApiRequest({ req, res, targetUrl, bodyBuffer }) {
+  return new Promise((resolve, reject) => {
+    const apiPath = (req.url || '/api').replace(/^\/api/, '') || '/';
+    const upstreamPath = `${targetUrl.pathname.replace(/\/$/, '')}${apiPath}`;
+    const client = targetUrl.protocol === 'https:' ? https : http;
+
+    const upstreamReq = client.request(
+      {
+        protocol: targetUrl.protocol,
+        hostname: targetUrl.hostname,
+        port: targetUrl.port || (targetUrl.protocol === 'https:' ? 443 : 80),
+        method: req.method,
+        path: upstreamPath,
+        headers: {
+          ...req.headers,
+          host: targetUrl.host,
+          'content-length': String(bodyBuffer.length),
+        },
+      },
+      (upstreamRes) => {
+        if (!res.headersSent) {
+          res.writeHead(upstreamRes.statusCode || 502, upstreamRes.headers);
+        }
+
+        upstreamRes.pipe(res);
+        upstreamRes.on('end', resolve);
+        upstreamRes.on('error', reject);
+      }
+    );
+
+    upstreamReq.setTimeout(12000, () => {
+      upstreamReq.destroy(new Error('upstream timeout'));
+    });
+
+    upstreamReq.on('error', reject);
+
+    if (bodyBuffer.length > 0 && req.method !== 'GET' && req.method !== 'HEAD') {
+      upstreamReq.write(bodyBuffer);
+    }
+
+    upstreamReq.end();
+  });
+}
+
 const server = http.createServer((req, res) => {
   if (!fs.existsSync(distDir)) {
     send(res, 503, 'Build artifacts not found. Run npm run build first.');
@@ -70,32 +137,41 @@ const server = http.createServer((req, res) => {
   }
 
   if ((req.url || '').startsWith('/api')) {
-    const apiPath = (req.url || '/api').replace(/^\/api/, '') || '/';
-    const upstreamPath = `${backendUrl.pathname.replace(/\/$/, '')}${apiPath}`;
-    const client = backendUrl.protocol === 'https:' ? https : http;
-    const upstreamReq = client.request(
-      {
-        protocol: backendUrl.protocol,
-        hostname: backendUrl.hostname,
-        port: backendUrl.port || (backendUrl.protocol === 'https:' ? 443 : 80),
-        method: req.method,
-        path: upstreamPath,
-        headers: {
-          ...req.headers,
-          host: backendUrl.host,
-        },
-      },
-      (upstreamRes) => {
-        res.writeHead(upstreamRes.statusCode || 502, upstreamRes.headers);
-        upstreamRes.pipe(res);
+    const bodyChunks = [];
+    req.on('data', (chunk) => bodyChunks.push(Buffer.from(chunk)));
+    req.on('error', () => {
+      if (!res.writableEnded) {
+        send(res, 400, 'Bad request');
       }
-    );
+    });
+    req.on('end', async () => {
+      const bodyBuffer = Buffer.concat(bodyChunks);
 
-    upstreamReq.on('error', () => {
-      send(res, 502, 'Bad gateway: failed to reach backend');
+      try {
+        await forwardApiRequest({ req, res, targetUrl: primaryBackendUrl, bodyBuffer });
+      } catch (primaryError) {
+        if (fallbackBackendUrl) {
+          try {
+            await forwardApiRequest({ req, res, targetUrl: fallbackBackendUrl, bodyBuffer });
+            return;
+          } catch (fallbackError) {
+            if (!res.writableEnded) {
+              send(
+                res,
+                502,
+                `Bad gateway: failed to reach backend (${primaryBackendUrl.host}, ${fallbackBackendUrl.host})`
+              );
+            }
+            return;
+          }
+        }
+
+        if (!res.writableEnded) {
+          send(res, 502, `Bad gateway: failed to reach backend (${primaryBackendUrl.host})`);
+        }
+      }
     });
 
-    req.pipe(upstreamReq);
     return;
   }
 
@@ -121,5 +197,8 @@ const server = http.createServer((req, res) => {
 
 server.listen(port, '0.0.0.0', () => {
   console.log(`FairPlay Click Game listening on http://0.0.0.0:${port}`);
-  console.log(`Proxying /api to ${backendUrl.origin}${backendUrl.pathname}`);
+  console.log(`Primary /api target: ${primaryBackendUrl.origin}${primaryBackendUrl.pathname}`);
+  if (fallbackBackendUrl) {
+    console.log(`Fallback /api target: ${fallbackBackendUrl.origin}${fallbackBackendUrl.pathname}`);
+  }
 });
